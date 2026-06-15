@@ -1,11 +1,11 @@
 
 services:
     - type: web
-    name: saqr-alfalah
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    envVars:
+       name: saqr-alfalah
+        env: python
+        buildCommand: pip install -r requirements.txt
+       startCommand: python main.py
+        envVars:
             - key: TELEGRAM_TOKEN
         value: 7123456789:AAEabc123xyz456
             - key: CHAT_ID
