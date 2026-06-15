@@ -6,6 +6,6 @@ services:
     startCommand: python main.py
     envVars:
             - key: TELEGRAM_TOKEN
-        value:         value: 8012345678:AAFkdjsaFJDKL_ASdj1239fkl
+                 value: 8012345678:AAFkdjsaFJDKL_ASdj1239fkl
             - key: CHAT_ID
-        value:         value: 987654321
+                  value: 987654321
