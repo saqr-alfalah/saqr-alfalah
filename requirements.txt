@@ -1,3 +1,96 @@
-pyTelegramBotAPI==4.14.0
-Flask==3.0.0
-gunicorn==21.2.0
+from flask import Flask, request
+import telebot
+import os
+import google.generativeai as genai
+import requests
+from PIL import Image
+from io import BytesIO
+from datetime import datetime
+
+TOKEN = "8538133472:AAFzQrzw2eNETF3CaYNCQ0NmRmvvCGiEwzU"
+SECRET = "182177"
+GEMINI_KEY = "AIzaSy...c7nw" # ← حط مفتاح Gemini كامل هنا بدل النقاط
+ADMIN_CHAT_ID = "7635548563" # ← هذا الايدي حقك
+
+app = Flask(__name__)
+bot = telebot.TeleBot(TOKEN)
+genai.configure(api_key=GEMINI_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+main_keyboard = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+main_keyboard.row("📍 تحليل مخالفة AI", "📊 استشارة فنية")
+main_keyboard.row("📋 ارسل الموقع")
+
+@app.route('/')
+def home():
+    return 'Bot is running'
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.args.get('secret')!= SECRET:
+        return 'Unauthorized', 403
+    update = telebot.types.Update.de_json(request.get_data().decode('utf-8'))
+    bot.process_new_updates([update])
+    return 'ok', 200
+
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "حياك في صقر الفلاح الذكي 🌾\nارسل صورة المخالفة + موقعك وانا احللها لك مجاناً بالذكاء الاصطناعي", reply_markup=main_keyboard)
+
+@bot.message_handler(content_types=['photo'])
+def handle_photo_gemini(message):
+    msg = bot.reply_to(message, "جاري تحليل الصورة مع Gemini... ⏳")
+    try:
+        file_id = message.photo[-1].file_id
+        file_info = bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{TOKEN}/{file_info.file_path}"
+        response = requests.get(file_url)
+        img = Image.open(BytesIO(response.content))
+
+        prompt = """انت خبير مشاريع مياه وبنية تحتية في السعودية تابع لشركة صقر الفلاح.
+        حلل صورة المخالفة الميدانية هذي واعطني تقرير مختصر بالنقاط:
+        1. نوع المخالفة: وصف دقيق للمشكلة
+        2. مستوى الخطورة: منخفض/متوسط/عالي/كارثي
+        3. التوصية الفنية العاجلة: وش يسوي المراقب الحين
+        4. البند المخالف: حسب كود وزارة البيئة والمياه والزراعة
+        5. التكلفة التقديرية للإصلاح
+        رد بالعربي وبشكل مباشر للمراقب الميداني."""
+
+        result = model.generate_content([prompt, img])
+        ai_result = result.text
+
+        final_report = f"🤖 تحليل Gemini المجاني:\n\n{ai_result}\n\nوقت البلاغ: {datetime.now().strftime('%Y-%m-%d %H:%M')}\nالمبلغ: @{message.from_user.username}"
+        
+        bot.edit_message_text(final_report, message.chat.id, msg.message_id)
+        bot.send_message(ADMIN_CHAT_ID, f"🚨 بلاغ جديد:\n\n{final_report}")
+        bot.send_photo(ADMIN_CHAT_ID, file_id)
+
+    except Exception as e:
+        bot.edit_message_text(f"صار خطأ: {str(e)}", message.chat.id, msg.message_id)
+
+@bot.message_handler(func=lambda message: message.text == "📊 استشارة فنية")
+def ask_question(message):
+    bot.reply_to(message, "اكتب سؤالك الفني عن مشاريع المياه والبنية التحتية:")
+    bot.register_next_step_handler(message, ai_consult_gemini)
+
+def ai_consult_gemini(message):
+    try:
+        prompt = f"انت استشاري أنظمة مياه وبنية تحتية في السعودية. جاوب على هذا السؤال باختصار وبدقة فنية حسب كود الوزارة: {message.text}"
+        response = model.generate_content(prompt)
+        bot.reply_to(message, response.text)
+    except:
+        bot.reply_to(message, "فيه ضغط. جرب بعد دقيقة")
+
+@bot.message_handler(content_types=['location'])
+def handle_location(message):
+    lat = message.location.latitude
+    lon = message.location.longitude
+    bot.reply_to(message, f"تم حفظ الموقع ✅\nhttps://maps.google.com/?q={lat},{lon}\nالحين ارسل صورة المخالفة")
+
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    bot.reply_to(message, "ارسل صورة المخالفة مباشرة للتحليل، او استخدم الأزرار 👇", reply_markup=main_keyboard)
+
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host="0.0.0.0", port=port)
