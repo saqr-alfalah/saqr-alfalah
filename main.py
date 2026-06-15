@@ -1,22 +1,34 @@
-import os
+from flask import Flask, request
 import telebot
-from telebot import types
+import os
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
-bot = telebot.TeleBot(BOT_TOKEN)
+TOKEN = "8538133472:AAFzQrzw2eNETF3CaYNCQ0NmRmvvCGiEwzU"
+SECRET = "182177"
+
+app = Flask(__name__)
+bot = telebot.TeleBot(TOKEN)
+
+@app.route('/')
+def home():
+    return 'Bot is running'
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.args.get('secret')!= SECRET:
+        return 'Unauthorized', 403
+    json_string = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return 'ok', 200
 
 @bot.message_handler(commands=['start'])
-def start(message):
-    bot.reply_to(message, "🦅 مرحبا بك في بوت صقر الفلاح\nأرسل لي صورة المخالفة أو وصفها وأنا أحللها لك")
-
-@bot.message_handler(content_types=['photo'])
-def handle_photo(message):
-    bot.reply_to(message, "📸 استلمت الصورة. جاري التحليل...\n\n⚠️ نوع المخالفة: عدم لبس خوذة السلامة\n📍 المعيار: SA-S-002\n💡 التوصية: إيقاف العمل فورا وتوجيه العامل")
+def send_welcome(message):
+    bot.reply_to(message, "حياك الله في بوت صقر الفلاح 🌾")
 
 @bot.message_handler(func=lambda message: True)
-def handle_text(message):
-    bot.reply_to(message, "📝 استلمت وصفك. جاري التحليل...\n\n⚠️ نوع المخالفة: منطقة عمل غير محمية\n📍 المعيار: SA-S-015\n💡 التوصية: وضع حواجز ولوحات تحذيرية")
+def echo_all(message):
+    bot.reply_to(message, "وصلتني: " + message.text)
 
 if __name__ == "__main__":
-    print("Bot started...")
-    bot.infinity_polling()
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host="0.0.0.0", port=port)
