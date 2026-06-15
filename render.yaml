@@ -1,11 +1,11 @@
-    services:
-    - type:  worker
-        name: saqr-alfalah
-        env: python
-        buildCommand: pip install -r requirements.txt
-        startCommand: python main.py
-        envVars:
+services:
+    - type: worker
+    name: saqr-alfalah-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
             - key: TELEGRAM_TOKEN
-        sync: false
+              sync: false
             - key: CHAT_ID
-        sync: false
+              sync: false
